@@ -1,0 +1,19 @@
+# Hand Project Python Dependencies
+# Install with: pip install -r requirements.txt
+
+# Core signal processing
+numpy>=1.21.0
+scipy>=1.7.0
+
+# Machine learning
+scikit-learn>=1.0.0
+
+# Serial communication
+pyserial>=3.5
+
+# Visualization (optional but recommended)
+matplotlib>=3.5.0
+
+# BrainFlow for advanced signal processing (optional)
+# Uncomment if you want to use BrainFlow's filters
+# brainflow>=5.0.0
