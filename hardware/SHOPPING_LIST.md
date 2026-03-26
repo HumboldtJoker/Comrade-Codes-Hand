@@ -2,8 +2,8 @@
 
 **Project:** Hand Project - Bidirectional Neural Interface
 **Budget:** $300-500 (revised from $400-800)
-**Last Updated:** 2026-02-14
-**Major Update:** Research found 70-80% cost reduction possible
+**Last Updated:** 2026-03-25
+**Major Update:** NeuroStimDuino v3.0 confirmed in stock. Purchase links verified. emg2pose dataset available for pretraining.
 
 ---
 
@@ -59,8 +59,9 @@
 **Quantity:** 1 unit (2 channels, stackable)
 **Cost:** **$260**
 **Shipping:** $8 US / $18 worldwide
-**Availability:** IN STOCK - Ships within 3 days
+**Availability:** IN STOCK (v3.0 shipping since Sept 2025)
 **Vendor:** [Crowd Supply](https://www.crowdsupply.com/neuralaxy/neurostimduino)
+**GitHub:** [neuralaxy/NeuroStimDuino](https://github.com/neuralaxy/NeuroStimDuino)
 
 **Specifications:**
 - Channels: 2 independent (stackable to 256)
@@ -69,6 +70,7 @@
 - Frequency: 3-100Hz
 - Pulse Width: 0-2ms
 - Interface: I2C, Arduino compatible
+- **v3.0 NEW:** Auto high-voltage power management (on when stimulating, off when idle)
 
 **Safety Features (Built-in):**
 - Opto-isolators for electrical isolation
@@ -231,5 +233,21 @@
 ---
 
 **List maintained by:** CC
-**Last updated:** 2026-02-14
-**Previous version:** 2025-10-27 (archived in git)
+**Last updated:** 2026-03-25
+**Previous versions:** 2026-02-14, 2025-10-27 (archived in git)
+
+---
+
+## Quick Order Checklist
+
+When funding arrives, order in this sequence:
+
+1. **BioAmp Candy x4** — $40 → [ORDER HERE](https://www.tindie.com/products/upsidedownlabs/muscle-bioamp-candy/)
+2. **NeuroStimDuino v3.0** — $260 → [ORDER HERE](https://www.crowdsupply.com/neuralaxy/neurostimduino)
+3. **Arduino Due** — ~$40 → [Amazon search](https://www.amazon.com/s?k=arduino+due) or scavenge
+4. **TENS electrode pads** — ~$20 → [Amazon search](https://www.amazon.com/s?k=TENS+electrode+pads+2+inch+round+reusable)
+5. **Jumper wires + breadboard** — ~$15 → [Amazon search](https://www.amazon.com/s?k=jumper+wire+breadboard+kit)
+
+**Total: ~$375**
+
+Expected delivery: 1-2 weeks for all components.
