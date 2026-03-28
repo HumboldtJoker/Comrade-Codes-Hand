@@ -173,8 +173,8 @@ def download_mini_dataset():
     import urllib.request
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    url = "https://fb-ctrl-oss.s3.amazonaws.com/emg2pose/emg2pose_mini_dataset.tar"
-    tar_path = DATA_DIR / "emg2pose_mini_dataset.tar"
+    url = "https://fb-ctrl-oss.s3.amazonaws.com/emg2pose/emg2pose_dataset_mini.tar"
+    tar_path = DATA_DIR / "emg2pose_dataset_mini.tar"
 
     if tar_path.exists():
         logger.info("Mini dataset already downloaded: %s", tar_path)
