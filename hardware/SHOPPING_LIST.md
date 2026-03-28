@@ -137,6 +137,8 @@
 | Stimulation | NeuroStimDuino | $260 | BUY IMMEDIATELY |
 | Processing | Arduino Due | $40 | Scavenge first |
 | Electrodes | TENS pads | $20 | Buy |
+| Wearable | Compression sleeve + velcro | $15 | Buy |
+| Fabrication | 3D printed mounts (see hardware/3d_models/) | $10 | Find printer |
 | Misc | Wiring, mounting | $30 | Mostly scavenge |
 | **Total** | | **~$390** | |
 
