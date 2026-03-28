@@ -257,16 +257,33 @@ class CalibrationSession:
             count = np.sum(y == gesture.value)
             print(f"  {gesture.name}: {count} samples")
 
-        # Create and train classifier
+        # Create classifier
         classifier = GestureClassifier(
             input_size=16,
             hidden_sizes=[32, 16],
             num_classes=len(Gesture),
-            learning_rate=0.01
+            learning_rate=0.005  # Lower LR for fine-tuning
         )
 
+        # Load pretrained weights if available (emg2pose: 193 users, 370 hours)
+        pretrained_path = Path(__file__).parent.parent / "pretrain" / "weights" / "pretrained_emg2pose.npz"
+        if pretrained_path.exists():
+            print("\n  Loading pretrained weights (emg2pose: 193 users)...")
+            data = np.load(pretrained_path)
+            classifier.weights = [data[f"w{i}"] for i in range(len(classifier.weights))]
+            classifier.biases = [data[f"b{i}"] for i in range(len(classifier.biases))]
+            classifier.feature_mean = data["feature_mean"]
+            classifier.feature_std = data["feature_std"]
+            print("  Pretrained weights loaded — fine-tuning on your data")
+            print("  (This is why calibration only takes 2-3 minutes!)")
+            epochs = 30  # Much fewer epochs needed for fine-tuning
+        else:
+            print("\n  No pretrained weights found — training from scratch")
+            print("  (Run pretrain/emg2pose_pipeline.py --all for faster calibration)")
+            epochs = 150  # Full training needed
+
         print("\nTraining neural network...")
-        history = classifier.train(X, y, epochs=150, batch_size=16, validation_split=0.2)
+        history = classifier.train(X, y, epochs=epochs, batch_size=16, validation_split=0.2)
 
         final_accuracy = history['val_accuracy'][-1]
         print(f"\n{'='*60}")
