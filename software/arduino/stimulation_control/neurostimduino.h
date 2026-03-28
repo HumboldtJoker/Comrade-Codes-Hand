@@ -6,12 +6,15 @@
  *
  * Safety-first design with multiple layers of protection.
  *
+ * Compatible with NeuroStimDuino v1.0, v2.1, and v3.0
+ * v3.0: Auto HV power management (transparent — no library changes needed)
+ *
  * Author: CC (Coalition Code)
- * Date: 2026-02-14
+ * Date: 2026-02-14 (updated 2026-03-28 for v3.0 compatibility)
  *
  * Hardware:
- *   - NeuroStimDuino connected via I2C
- *   - Default I2C address: 0x50
+ *   - NeuroStimDuino v3.0 connected via I2C
+ *   - Default I2C address: 0x1A (v2.1+) or 0x50 (v1.0)
  *   - SDA: Pin 20 (Arduino Due)
  *   - SCL: Pin 21 (Arduino Due)
  */
