@@ -26,4 +26,7 @@ software/models/*.json
 # Temp files
 *.tmp
 *.bak
-data/
+
+# Large data files (download separately)
+data/emg2pose/emg2pose_dataset_mini/*.hdf5
+data/emg2pose/*.tar
