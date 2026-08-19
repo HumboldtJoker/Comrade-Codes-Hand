@@ -147,13 +147,27 @@ class HandSimulator:
                     self.fingers[f].current_angle, 0, 90
                 )
 
-    def step(self):
-        """Advance one timestep — fingers move toward targets."""
+    def step(self, fes_active: bool = True):
+        """Advance one timestep — fingers move toward targets.
+
+        In standalone mode (set_target_pose + step), fingers animate toward
+        targets. In closed-loop mode, call with fes_active=False when no FES
+        is commanding — fingers drift toward resting angles (passive tissue
+        elasticity).
+        """
+        REST_ANGLE = 15.0
+        PASSIVE_RETURN_RATE = 1.0  # deg per step toward rest when no FES
+
         for sf in self.fingers.values():
-            error = sf.target_angle - sf.current_angle
-            max_step = MAX_SPEED_DEG_PER_STEP * sf.speed
-            step = np.clip(error, -max_step, max_step)
-            sf.current_angle += step
+            if fes_active:
+                error = sf.target_angle - sf.current_angle
+                max_step = MAX_SPEED_DEG_PER_STEP * sf.speed
+                step = np.clip(error, -max_step, max_step)
+                sf.current_angle += step
+            else:
+                rest_error = REST_ANGLE - sf.current_angle
+                drift = np.clip(rest_error, -PASSIVE_RETURN_RATE, PASSIVE_RETURN_RATE)
+                sf.current_angle += drift
             sf.current_angle = np.clip(sf.current_angle, 0, 90)
         self.frame_index += 1
 

@@ -72,7 +72,7 @@ class ClosedLoopSim:
         fes_gain: float = 1.0,
     ):
         self.hand = HandSimulator(noise=noise)
-        self.error_computer = ErrorComputer(smoothing=0.5, gain=0.7)
+        self.error_computer = ErrorComputer(smoothing=0.5, gain=0.7, deadzone_deg=2.0)
         self.fes_mapper = FESMapper(gain=fes_gain)
         self.loop_rate_hz = loop_rate_hz
         self.dt = 1.0 / loop_rate_hz
@@ -86,9 +86,11 @@ class ClosedLoopSim:
         commands = self.fes_mapper.from_correction(correction)
 
         self.hand.apply_fes_response(commands, self.dt)
-        # Don't call step() — in closed-loop mode, only FES moves the hand.
-        # step() drives toward the simulator's internal target, which fights
-        # the FES controller. The real hand moves only because muscles contract.
+        # NOTE: Passive tissue return (spring-back to rest) is modeled in
+        # hand_simulator.step(fes_active=False) but requires per-finger FES
+        # tracking to avoid fighting the controller. Deferred to hardware
+        # integration — real muscle elasticity data will inform the model
+        # better than simulation tweaking.
 
         total_current = sum(c.current_ua for c in commands)
         per_finger = {
