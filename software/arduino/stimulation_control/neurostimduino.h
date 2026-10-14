@@ -1,465 +1,348 @@
 /*
- * NeuroStimDuino Interface Library
+ * NeuroStimDuino safety wrapper for the Arduino Due.
  *
- * Wrapper for controlling NeuroStimDuino electrical stimulator
- * via I2C from Arduino Due.
+ * Speaks the board's own I2C protocol, as implemented in Neuralaxy's Arduino library
+ * (github.com/neuralaxy/NeuroStimDuino, Software/NeuroStimDuino/NeuroStimDuino.{h,cpp}, read 2026-10-14).
+ * Every frame is [byte count][command][channel][data...], the count being the number of bytes after it.
+ * Channels are 1 and 2 on the wire; this wrapper's API numbers them 0 and 1, as the Python StimParams does.
  *
- * Safety-first design with multiple layers of protection.
+ * History: the version of this file written 2026-02-14 used a register map (REG_CONTROL = 0x00, ...) that
+ * the board does not have. Its emergency stop sent bytes the board would not read as a stop. This rewrite
+ * replaces it. Nothing here has run on real hardware yet: every behaviour below is checked by the host tests
+ * in software/arduino/tests/host/ and must be checked again on the bench (docs/HARDWARE_OPTIONS_20261014.md).
  *
- * Compatible with NeuroStimDuino v1.0, v2.1, and v3.0
- * v3.0: Auto HV power management (transparent — no library changes needed)
- *
- * Author: CC (Coalition Code)
- * Date: 2026-02-14 (updated 2026-03-28 for v3.0 compatibility)
+ * Safety rules this file enforces:
+ *   - A current above ABSOLUTE_MAX_UA is an emergency stop, checked BEFORE the working limit.
+ *   - A current above MAX_CURRENT_UA is refused, and nothing changes on the board.
+ *   - A refused parameter set leaves nothing to start: startStim() refuses until a valid set is accepted.
+ *   - Every stimulation has a duration (0 is refused), at most MAX_STIM_DURATION_MS. The board is told to stop by
+ *     itself at the end of a lease of whole seconds covering it, and the continuous flag is always 0, so a
+ *     controller that dies mid-stimulation leaves the board running for at most the lease.
+ *   - The emergency stop sends the board's emergency OFF first, then STOP on both channels, and latches: nothing
+ *     starts again until resetAfterStop() is called on purpose.
+ *   - A STOP the board does not confirm is escalated to an emergency stop.
+ *   - Current is converted down to the board's 240 uA steps, never up.
  *
  * Hardware:
- *   - NeuroStimDuino v3.0 connected via I2C
- *   - Default I2C address: 0x1A (v2.1+) or 0x50 (v1.0)
- *   - SDA: Pin 20 (Arduino Due)
- *   - SCL: Pin 21 (Arduino Due)
+ *   - On the Due the vendor library uses Wire1 (SDA1/SCL1), and so does this file.
+ *   - Default address 0x1A (v2.1 and later).
+ *   - The Due's pins are 3.3 V only: confirm the board's I2C levels on the bench before connecting (gate B0).
  */
 
 #ifndef NEUROSTIMDUINO_H
 #define NEUROSTIMDUINO_H
 
+#include <Arduino.h>
 #include <Wire.h>
 
+#if defined(__SAM3X8E__)
+  #define NSD_WIRE Wire1
+#else
+  #define NSD_WIRE Wire
+#endif
+
 // ============================================================================
-// SAFETY LIMITS - DO NOT EXCEED
+// SAFETY LIMITS - change only with measured data and the advisor (docs/HARDWARE_OPTIONS_20261014.md)
 // ============================================================================
 
-// Maximum safe current for surface stimulation (microamps)
-// Research says 22mA max for NeuroStimDuino, but we start much lower
-#define MAX_CURRENT_UA 5000     // 5mA - conservative start
-#define ABSOLUTE_MAX_UA 15000   // 15mA - never exceed this
-
-// Maximum pulse width (microseconds)
-#define MAX_PULSE_WIDTH_US 500  // 500us - comfortable range
-
-// Frequency limits (Hz)
+#define MAX_CURRENT_UA 5000        // working ceiling
+#define ABSOLUTE_MAX_UA 15000      // above this is an emergency stop, never a clamp
+#define MAX_PULSE_WIDTH_US 500
+#define MIN_PULSE_WIDTH_US 7       // the board's clock resolution is 6.4 us
 #define MIN_FREQUENCY_HZ 3
-#define MAX_FREQUENCY_HZ 50     // Higher frequencies can be painful
+#define MAX_FREQUENCY_HZ 50
+#define MAX_STIM_DURATION_MS 5000  // every stimulation has a duration, at most this
 
-// Maximum continuous stimulation time (milliseconds)
-#define MAX_STIM_DURATION_MS 5000  // 5 seconds max continuous
+#define NSD_UA_PER_STEP 240        // the board's current resolution
+#define NSD_DEFAULT_ADDRESS 0x1A
+#define NSD_WRITE_SETTLE_MS 3      // the vendor waits this long after each write for the board to process it
 
-// ============================================================================
-// STIMULATION PARAMETERS
-// ============================================================================
+// The board's I2C commands (vendor library enum I2Ccommand).
+#define NSD_CMD_AMPL 0x01
+#define NSD_CMD_FREQ 0x02
+#define NSD_CMD_DURN 0x03
+#define NSD_CMD_EOFF 0x0F
+#define NSD_CMD_STIM 0x10
+#define NSD_CMD_STOP 0x12
+#define NSD_CMD_ENAB 0x14
+#define NSD_CMD_RAMP 0x1B
+#define NSD_STOP_CONFIRMED 0       // what the board answers after a STOP that worked
 
 struct StimParams {
-  int16_t current_ua;       // Current in microamps (-22000 to +22000)
-  uint16_t pulse_width_us;  // Pulse width in microseconds
-  uint8_t frequency_hz;     // Stimulation frequency
-  uint16_t duration_ms;     // Total duration
-  uint8_t channel;          // Channel 0 or 1
-  bool biphasic;            // Charge-balanced biphasic (ALWAYS true for safety)
+  int16_t current_ua;       // microamps; refused above MAX_CURRENT_UA, emergency stop above ABSOLUTE_MAX_UA
+  uint16_t pulse_width_us;
+  uint8_t frequency_hz;
+  uint16_t duration_ms;     // 1..MAX_STIM_DURATION_MS; 0 is refused
+  uint8_t channel;          // 0 or 1 (the board's channel 1 or 2)
+  bool biphasic;            // must be true
 };
 
-// ============================================================================
-// FEEDBACK PATTERNS - Pre-defined safe stimulation patterns
-// ============================================================================
-
-// Confirmation pulse - brief, gentle feedback
-const StimParams FEEDBACK_CONFIRM = {
-  .current_ua = 2000,      // 2mA - gentle
-  .pulse_width_us = 200,
-  .frequency_hz = 20,
-  .duration_ms = 200,      // 200ms burst
-  .channel = 0,
-  .biphasic = true
-};
-
-// Warning pulse - slightly stronger
-const StimParams FEEDBACK_WARNING = {
-  .current_ua = 3000,      // 3mA
-  .pulse_width_us = 250,
-  .frequency_hz = 30,
-  .duration_ms = 300,
-  .channel = 0,
-  .biphasic = true
-};
-
-// Success pattern - double pulse
-const StimParams FEEDBACK_SUCCESS = {
-  .current_ua = 2500,
-  .pulse_width_us = 200,
-  .frequency_hz = 25,
-  .duration_ms = 100,
-  .channel = 0,
-  .biphasic = true
-};
-
-// ============================================================================
-// NEUROSTIMDUINO CLASS
-// ============================================================================
+const StimParams FEEDBACK_CONFIRM = {2000, 200, 20, 200, 0, true};
+const StimParams FEEDBACK_WARNING = {3000, 250, 30, 300, 0, true};
+const StimParams FEEDBACK_SUCCESS = {2500, 200, 25, 100, 0, true};
 
 class NeuroStimDuino {
 public:
-  // Constructor with I2C address
-  NeuroStimDuino(uint8_t address = 0x50);
-
-  // Initialize I2C communication
-  bool begin();
-
-  // Check if device is responding
-  bool isConnected();
-
-  // Emergency stop - immediately halt all stimulation
-  void emergencyStop();
-
-  // Enable/disable output (safety interlock)
-  void setOutputEnabled(bool enabled);
-  bool isOutputEnabled();
-
-  // Set stimulation parameters (with safety checks)
-  bool setParams(const StimParams& params);
-
-  // Start stimulation with current parameters
-  bool startStim();
-
-  // Stop stimulation
-  void stopStim();
-
-  // Check if currently stimulating
-  bool isStimulating();
-
-  // Get current stimulation status
-  void getStatus(int16_t& current, uint16_t& pulseWidth, uint8_t& frequency);
-
-  // High-level feedback functions
-  void pulseConfirm();       // Brief confirmation
-  void pulseWarning();       // Warning signal
-  void pulseSuccess();       // Success double-pulse
-  void pulsePattern(const StimParams& pattern, int repeats = 1, int gap_ms = 100);
-
-  // Calibration - find comfortable threshold for user
-  int16_t calibrateThreshold(uint8_t channel);
-
-  // Safety status
-  bool isSafetyOK();
-  String getLastError();
-
-private:
-  uint8_t _address;
-  bool _enabled;
-  bool _stimulating;
-  unsigned long _stimStartTime;
-  StimParams _currentParams;
-  String _lastError;
-
-  // Safety validation
-  bool validateParams(const StimParams& params);
-
-  // I2C communication
-  void writeRegister(uint8_t reg, uint8_t value);
-  void writeRegister16(uint8_t reg, int16_t value);
-  uint8_t readRegister(uint8_t reg);
-  int16_t readRegister16(uint8_t reg);
-
-  // NeuroStimDuino register addresses (from datasheet)
-  static const uint8_t REG_CONTROL = 0x00;
-  static const uint8_t REG_CURRENT_CH0 = 0x01;
-  static const uint8_t REG_CURRENT_CH1 = 0x02;
-  static const uint8_t REG_PULSE_WIDTH = 0x03;
-  static const uint8_t REG_FREQUENCY = 0x04;
-  static const uint8_t REG_STATUS = 0x05;
-
-  // Control register bits
-  static const uint8_t CTRL_ENABLE = 0x01;
-  static const uint8_t CTRL_START = 0x02;
-  static const uint8_t CTRL_STOP = 0x04;
-  static const uint8_t CTRL_BIPHASIC = 0x08;
-};
-
-// ============================================================================
-// IMPLEMENTATION
-// ============================================================================
-
-NeuroStimDuino::NeuroStimDuino(uint8_t address)
-  : _address(address), _enabled(false), _stimulating(false),
-    _stimStartTime(0), _lastError("") {
-  _currentParams = {0, 0, 0, 0, 0, true};
-}
-
-bool NeuroStimDuino::begin() {
-  Wire.begin();
-
-  // Check device presence
-  Wire.beginTransmission(_address);
-  if (Wire.endTransmission() != 0) {
-    _lastError = "Device not found at I2C address";
-    return false;
+  explicit NeuroStimDuino(uint8_t address = NSD_DEFAULT_ADDRESS)
+    : _address(address), _enabled(false), _stimulating(false), _latched(false), _paramsValid(false),
+      _stimStartTime(0), _lastError("") {
+    _currentParams = {0, 0, 0, 0, 0, true};
   }
 
-  // Ensure output is disabled on startup
-  setOutputEnabled(false);
-  stopStim();
-
-  return true;
-}
-
-bool NeuroStimDuino::isConnected() {
-  Wire.beginTransmission(_address);
-  return Wire.endTransmission() == 0;
-}
-
-void NeuroStimDuino::emergencyStop() {
-  // Immediate halt - no validation, just stop
-  writeRegister(REG_CONTROL, CTRL_STOP);
-  writeRegister16(REG_CURRENT_CH0, 0);
-  writeRegister16(REG_CURRENT_CH1, 0);
-  _enabled = false;
-  _stimulating = false;
-  _lastError = "Emergency stop activated";
-}
-
-void NeuroStimDuino::setOutputEnabled(bool enabled) {
-  if (enabled) {
-    writeRegister(REG_CONTROL, CTRL_ENABLE | CTRL_BIPHASIC);
-  } else {
-    stopStim();
-    writeRegister(REG_CONTROL, 0);
-  }
-  _enabled = enabled;
-}
-
-bool NeuroStimDuino::isOutputEnabled() {
-  return _enabled;
-}
-
-bool NeuroStimDuino::validateParams(const StimParams& params) {
-  // Current limits
-  if (abs(params.current_ua) > MAX_CURRENT_UA) {
-    _lastError = "Current exceeds safe limit";
-    return false;
-  }
-  if (abs(params.current_ua) > ABSOLUTE_MAX_UA) {
-    _lastError = "Current exceeds absolute maximum";
-    emergencyStop();
-    return false;
+  bool begin() {
+    NSD_WIRE.begin();
+    if (!isConnected()) {
+      _lastError = "Device not found at I2C address";
+      return false;
+    }
+    stopChannel(1);
+    stopChannel(2);
+    enableChannels(false);
+    send3(NSD_CMD_RAMP, 0xFF, 1);          // ramping on for both channels (vendor frame: 0xFF in the channel slot)
+    return true;
   }
 
-  // Pulse width limits
-  if (params.pulse_width_us > MAX_PULSE_WIDTH_US) {
-    _lastError = "Pulse width too long";
-    return false;
+  bool isConnected() {
+    NSD_WIRE.beginTransmission(_address);
+    return NSD_WIRE.endTransmission() == 0;
   }
 
-  // Frequency limits
-  if (params.frequency_hz < MIN_FREQUENCY_HZ || params.frequency_hz > MAX_FREQUENCY_HZ) {
-    _lastError = "Frequency out of safe range";
-    return false;
+  // Board-level emergency OFF first, then STOP on both channels. Latches until resetAfterStop().
+  void emergencyStop() {
+    send1(NSD_CMD_EOFF);
+    send2(NSD_CMD_STOP, 1);
+    send2(NSD_CMD_STOP, 2);
+    _enabled = false;
+    _stimulating = false;
+    _paramsValid = false;
+    _latched = true;
+    _lastError = "Emergency stop activated";
   }
 
-  // Duration limits
-  if (params.duration_ms > MAX_STIM_DURATION_MS) {
-    _lastError = "Duration too long";
-    return false;
+  bool isLatched() const { return _latched; }
+
+  // The deliberate step after an emergency stop. Leaves the output disabled and no parameters loaded.
+  void resetAfterStop() {
+    _latched = false;
+    _paramsValid = false;
+    _lastError = "";
   }
 
-  // Must be biphasic for safety
-  if (!params.biphasic) {
-    _lastError = "Non-biphasic stimulation not allowed";
-    return false;
-  }
-
-  // Channel validation
-  if (params.channel > 1) {
-    _lastError = "Invalid channel";
-    return false;
-  }
-
-  return true;
-}
-
-bool NeuroStimDuino::setParams(const StimParams& params) {
-  if (!validateParams(params)) {
-    return false;
-  }
-
-  _currentParams = params;
-
-  // Set registers
-  if (params.channel == 0) {
-    writeRegister16(REG_CURRENT_CH0, params.current_ua);
-    writeRegister16(REG_CURRENT_CH1, 0);
-  } else {
-    writeRegister16(REG_CURRENT_CH0, 0);
-    writeRegister16(REG_CURRENT_CH1, params.current_ua);
-  }
-
-  writeRegister(REG_PULSE_WIDTH, params.pulse_width_us / 10);  // Register in 10us units
-  writeRegister(REG_FREQUENCY, params.frequency_hz);
-
-  return true;
-}
-
-bool NeuroStimDuino::startStim() {
-  if (!_enabled) {
-    _lastError = "Output not enabled";
-    return false;
-  }
-
-  if (_stimulating) {
-    stopStim();  // Stop any existing stimulation first
-  }
-
-  writeRegister(REG_CONTROL, CTRL_ENABLE | CTRL_BIPHASIC | CTRL_START);
-  _stimulating = true;
-  _stimStartTime = millis();
-
-  return true;
-}
-
-void NeuroStimDuino::stopStim() {
-  writeRegister(REG_CONTROL, _enabled ? (CTRL_ENABLE | CTRL_BIPHASIC) : 0);
-  _stimulating = false;
-}
-
-bool NeuroStimDuino::isStimulating() {
-  // Auto-stop if duration exceeded
-  if (_stimulating && _currentParams.duration_ms > 0) {
-    if (millis() - _stimStartTime >= _currentParams.duration_ms) {
+  void setOutputEnabled(bool enabled) {
+    if (enabled && _latched) {
+      _lastError = "Latched by an emergency stop: call resetAfterStop() first";
+      return;
+    }
+    if (!enabled) {
       stopStim();
     }
+    enableChannels(enabled);
+    _enabled = enabled;
   }
-  return _stimulating;
-}
 
-void NeuroStimDuino::getStatus(int16_t& current, uint16_t& pulseWidth, uint8_t& frequency) {
-  current = readRegister16(REG_CURRENT_CH0);
-  pulseWidth = readRegister(REG_PULSE_WIDTH) * 10;
-  frequency = readRegister(REG_FREQUENCY);
-}
+  bool isOutputEnabled() const { return _enabled; }
 
-// High-level feedback functions
-void NeuroStimDuino::pulseConfirm() {
-  pulsePattern(FEEDBACK_CONFIRM, 1, 0);
-}
+  bool setParams(const StimParams& params) {
+    _paramsValid = false;                  // whatever happens next, a refused set leaves nothing to start
+    if (_latched) {
+      _lastError = "Latched by an emergency stop";
+      return false;
+    }
+    if (!validateParams(params)) {
+      return false;
+    }
+    uint8_t ch = params.channel + 1;
+    uint8_t steps = (uint8_t)(params.current_ua / NSD_UA_PER_STEP);   // rounds down, never up
+    send3(NSD_CMD_AMPL, ch, steps);
+    send3(NSD_CMD_FREQ, ch, params.frequency_hz);
+    send4(NSD_CMD_DURN, ch, params.pulse_width_us & 0xFF, (params.pulse_width_us >> 8) & 0xFF);
+    _currentParams = params;
+    _paramsValid = true;
+    return true;
+  }
 
-void NeuroStimDuino::pulseWarning() {
-  pulsePattern(FEEDBACK_WARNING, 1, 0);
-}
+  bool startStim() {
+    if (_latched) {
+      _lastError = "Latched by an emergency stop";
+      return false;
+    }
+    if (!_enabled) {
+      _lastError = "Output not enabled";
+      return false;
+    }
+    if (!_paramsValid) {
+      _lastError = "No accepted parameters to start";
+      return false;
+    }
+    if (_stimulating) {
+      stopStim();
+      if (_latched) return false;
+    }
+    // The board stops by itself at the end of the lease; the continuous flag is never set.
+    uint8_t lease_s = (uint8_t)((_currentParams.duration_ms + 999) / 1000);
+    send4(NSD_CMD_STIM, _currentParams.channel + 1, lease_s, 0);
+    _stimulating = true;
+    _stimStartTime = millis();
+    return true;
+  }
 
-void NeuroStimDuino::pulseSuccess() {
-  // Double pulse for success
-  pulsePattern(FEEDBACK_SUCCESS, 2, 150);
-}
+  void stopStim() {
+    if (!_stimulating) return;
+    _stimulating = false;
+    if (!stopChannel(_currentParams.channel + 1)) {
+      emergencyStop();
+      _lastError = "The board did not confirm a stop: emergency stop";
+    }
+  }
 
-void NeuroStimDuino::pulsePattern(const StimParams& pattern, int repeats, int gap_ms) {
-  for (int i = 0; i < repeats; i++) {
-    if (setParams(pattern)) {
-      startStim();
+  // Call often: stops a stimulation at the end of its duration.
+  bool isStimulating() {
+    if (_stimulating && millis() - _stimStartTime >= _currentParams.duration_ms) {
+      stopStim();
+    }
+    return _stimulating;
+  }
+
+  void pulseConfirm() { pulsePattern(FEEDBACK_CONFIRM, 1, 0); }
+  void pulseWarning() { pulsePattern(FEEDBACK_WARNING, 1, 0); }
+  void pulseSuccess() { pulsePattern(FEEDBACK_SUCCESS, 2, 150); }
+
+  void pulsePattern(const StimParams& pattern, int repeats = 1, int gap_ms = 100) {
+    for (int i = 0; i < repeats; i++) {
+      if (!setParams(pattern) || !startStim()) {
+        return;
+      }
       delay(pattern.duration_ms);
       stopStim();
-
+      if (_latched) return;
       if (i < repeats - 1 && gap_ms > 0) {
         delay(gap_ms);
       }
     }
   }
-}
 
-int16_t NeuroStimDuino::calibrateThreshold(uint8_t channel) {
-  // Start at minimum and increase until user feels it
-  // This would be done interactively with serial commands
-  // Returns the threshold current in microamps
-
-  Serial.println("Threshold calibration - press 'y' when you feel stimulation");
-
-  StimParams calibParams = {
-    .current_ua = 500,  // Start at 500uA
-    .pulse_width_us = 200,
-    .frequency_hz = 20,
-    .duration_ms = 500,
-    .channel = channel,
-    .biphasic = true
-  };
-
-  while (calibParams.current_ua <= MAX_CURRENT_UA) {
-    Serial.print("Testing ");
-    Serial.print(calibParams.current_ua);
-    Serial.println("uA...");
-
-    setParams(calibParams);
-    startStim();
-    delay(calibParams.duration_ms);
-    stopStim();
-
-    delay(500);  // Wait for user input
-
-    if (Serial.available()) {
-      char c = Serial.read();
-      if (c == 'y' || c == 'Y') {
-        Serial.print("Threshold found: ");
-        Serial.print(calibParams.current_ua);
-        Serial.println("uA");
-        return calibParams.current_ua;
+  // Raise one 240 uA step at a time to the working ceiling; stop at the first 'y' on Serial.
+  // Every step goes through setParams(): a refused step ends the search.
+  int16_t calibrateThreshold(uint8_t channel) {
+    Serial.println("Threshold calibration - send 'y' at the first visible twitch, anything else stops");
+    StimParams p = {NSD_UA_PER_STEP, 200, 20, 500, channel, true};
+    while (p.current_ua <= MAX_CURRENT_UA) {
+      if (!setParams(p) || !startStim()) {
+        return -1;
       }
+      delay(p.duration_ms);
+      stopStim();
+      if (_latched) return -1;
+      delay(500);
+      if (Serial.available()) {
+        char c = Serial.read();
+        if (c == 'y' || c == 'Y') {
+          return p.current_ua;
+        }
+        return -1;                           // any other key stops the search
+      }
+      p.current_ua += NSD_UA_PER_STEP;
     }
-
-    // Increase by 500uA steps
-    calibParams.current_ua += 500;
+    return -1;
   }
 
-  Serial.println("Threshold not found within safe limits");
-  return -1;
-}
-
-bool NeuroStimDuino::isSafetyOK() {
-  // Check all safety conditions
-  if (!isConnected()) {
-    _lastError = "Device disconnected";
-    return false;
+  bool isSafetyOK() {
+    if (!isConnected()) {
+      _lastError = "Device disconnected";
+      return false;
+    }
+    if (_stimulating && millis() - _stimStartTime > MAX_STIM_DURATION_MS) {
+      emergencyStop();
+      _lastError = "Maximum stimulation duration exceeded";
+      return false;
+    }
+    return !_latched;
   }
 
-  // Check for overlong stimulation
-  if (_stimulating && millis() - _stimStartTime > MAX_STIM_DURATION_MS) {
-    emergencyStop();
-    _lastError = "Maximum stimulation duration exceeded";
-    return false;
+  const char* getLastError() const { return _lastError; }
+
+private:
+  uint8_t _address;
+  bool _enabled;
+  bool _stimulating;
+  bool _latched;
+  bool _paramsValid;
+  unsigned long _stimStartTime;
+  StimParams _currentParams;
+  const char* _lastError;
+
+  bool validateParams(const StimParams& params) {
+    // The absolute limit first: above it is an emergency stop, whatever else is wrong with the request.
+    if (params.current_ua > ABSOLUTE_MAX_UA || params.current_ua < -ABSOLUTE_MAX_UA) {
+      emergencyStop();
+      _lastError = "Current exceeds absolute maximum: emergency stop";
+      return false;
+    }
+    if (params.current_ua < 0 || params.current_ua > MAX_CURRENT_UA) {
+      _lastError = "Current outside 0..MAX_CURRENT_UA";
+      return false;
+    }
+    if (params.pulse_width_us < MIN_PULSE_WIDTH_US || params.pulse_width_us > MAX_PULSE_WIDTH_US) {
+      _lastError = "Pulse width out of range";
+      return false;
+    }
+    if (params.frequency_hz < MIN_FREQUENCY_HZ || params.frequency_hz > MAX_FREQUENCY_HZ) {
+      _lastError = "Frequency out of range";
+      return false;
+    }
+    if (params.duration_ms == 0 || params.duration_ms > MAX_STIM_DURATION_MS) {
+      _lastError = "Duration must be 1..MAX_STIM_DURATION_MS";
+      return false;
+    }
+    if (!params.biphasic) {
+      _lastError = "Non-biphasic stimulation not allowed";
+      return false;
+    }
+    if (params.channel > 1) {
+      _lastError = "Invalid channel";
+      return false;
+    }
+    return true;
   }
 
-  return true;
-}
+  void enableChannels(bool on) {
+    send3(NSD_CMD_ENAB, 1, on ? 1 : 0);
+    send3(NSD_CMD_ENAB, 2, on ? 1 : 0);
+  }
 
-String NeuroStimDuino::getLastError() {
-  return _lastError;
-}
+  // True only when the board answers that the channel has stopped.
+  bool stopChannel(uint8_t ch) {
+    if (send2(NSD_CMD_STOP, ch) != 0) return false;
+    NSD_WIRE.requestFrom(_address, (uint8_t)1);
+    if (!NSD_WIRE.available()) return false;
+    return NSD_WIRE.read() == NSD_STOP_CONFIRMED;
+  }
 
-// I2C communication helpers
-void NeuroStimDuino::writeRegister(uint8_t reg, uint8_t value) {
-  Wire.beginTransmission(_address);
-  Wire.write(reg);
-  Wire.write(value);
-  Wire.endTransmission();
-}
-
-void NeuroStimDuino::writeRegister16(uint8_t reg, int16_t value) {
-  Wire.beginTransmission(_address);
-  Wire.write(reg);
-  Wire.write((value >> 8) & 0xFF);
-  Wire.write(value & 0xFF);
-  Wire.endTransmission();
-}
-
-uint8_t NeuroStimDuino::readRegister(uint8_t reg) {
-  Wire.beginTransmission(_address);
-  Wire.write(reg);
-  Wire.endTransmission();
-  Wire.requestFrom(_address, (uint8_t)1);
-  return Wire.read();
-}
-
-int16_t NeuroStimDuino::readRegister16(uint8_t reg) {
-  Wire.beginTransmission(_address);
-  Wire.write(reg);
-  Wire.endTransmission();
-  Wire.requestFrom(_address, (uint8_t)2);
-  int16_t value = Wire.read() << 8;
-  value |= Wire.read();
-  return value;
-}
+  uint8_t finish() {
+    uint8_t err = NSD_WIRE.endTransmission();
+    delay(NSD_WRITE_SETTLE_MS);
+    return err;
+  }
+  uint8_t send1(uint8_t cmd) {
+    NSD_WIRE.beginTransmission(_address);
+    NSD_WIRE.write((uint8_t)1); NSD_WIRE.write(cmd);
+    return finish();
+  }
+  uint8_t send2(uint8_t cmd, uint8_t ch) {
+    NSD_WIRE.beginTransmission(_address);
+    NSD_WIRE.write((uint8_t)2); NSD_WIRE.write(cmd); NSD_WIRE.write(ch);
+    return finish();
+  }
+  uint8_t send3(uint8_t cmd, uint8_t ch, uint8_t value) {
+    NSD_WIRE.beginTransmission(_address);
+    NSD_WIRE.write((uint8_t)3); NSD_WIRE.write(cmd); NSD_WIRE.write(ch); NSD_WIRE.write(value);
+    return finish();
+  }
+  uint8_t send4(uint8_t cmd, uint8_t ch, uint8_t lsb, uint8_t msb) {
+    NSD_WIRE.beginTransmission(_address);
+    NSD_WIRE.write((uint8_t)4); NSD_WIRE.write(cmd); NSD_WIRE.write(ch); NSD_WIRE.write(lsb); NSD_WIRE.write(msb);
+    return finish();
+  }
+};
 
 #endif // NEUROSTIMDUINO_H
