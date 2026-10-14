@@ -285,9 +285,11 @@ team's.
 - **Scraigon (hardware):** the stage 1 build and the bench: the logic-level checks (B0), the dummy load and skin
   model (B1), the hardware stop and hold-to-enable switch (B2), the controller-loss test (B3), isolation (B4).
 - **Dwayne (ML):** four EMG channels and the stage 1 split (EMG for intent only while stimulation is off); the
-  blanking approach for later; whether to retrain at four channels on the full emg2pose set (the pretraining so far
-  used the 10-recording mini set, which only proves the plumbing). Note: emg2pose's code and data are CC BY-NC-SA
-  4.0 (non-commercial), so weights trained on it carry that licence (see `NOTICE`).
+  blanking approach for later; the pretraining data. **Thomas, 2026-10-14: move off emg2pose** (its code and data
+  are CC BY-NC-SA 4.0, non-commercial, and weights trained on it carry that licence; see `NOTICE`). Pretrain instead
+  on openly licensed EMG data and synthetic data, and on our own recordings from the real four-channel BioAmp setup,
+  which match our hardware better than a 16-channel wristband reduced to four. Per-user calibration still does most
+  of the work. Once the emg2pose files are replaced, they and their `NOTICE` entry come out.
 - **Alison:** the camera's role in finding motor points, and as the main safety sensor during stimulation, given
   that EMG is blind then.
 - **Thomas:** the stage 1 list; the tape mock-up at the fab lab; when to buy.
