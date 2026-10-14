@@ -1,5 +1,12 @@
 # Hardware Shopping List
 
+> **Superseded in part (2026-10-14).** Read `docs/HARDWARE_OPTIONS_20261014.md` before buying anything.
+> - The NeuroStimDuino now costs **$435**, not $260.
+> - "No IRB concerns for personal use" is **withdrawn**. The vendor says the board is "not intended for human use
+>   ... without prior approval from a local ethics committee". That question goes to our medtech advisor first.
+> - "BUY IMMEDIATELY" is withdrawn: buy after the team has read the options note. The 2-inch pads below probably
+>   won't move a hand at our 5 mA limit (section 3 of the note).
+
 **Project:** Hand Project - Bidirectional Neural Interface
 **Budget:** $300-500 (revised from $400-800)
 **Last Updated:** 2026-03-25
@@ -84,7 +91,7 @@
 - Ready to use immediately
 - Published safety features
 - Documented API
-- No IRB concerns for personal use
+- ~~No IRB concerns for personal use~~ (withdrawn 2026-10-14: see the note at the top)
 - $260 vs weeks of DIY time
 
 ### Alternative: openEMSstim + Commercial TENS

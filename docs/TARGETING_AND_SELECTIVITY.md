@@ -102,8 +102,11 @@ finger control from surface electrodes.
 - UNPROVEN for peripheral muscle FES
 - The forearm geometry is more complex than brain models
 - No published clinical FES hand systems use this approach
-- The NeuroStimDuino can generate arbitrary waveforms —
-  capable of producing the required carrier frequencies
+- ~~The NeuroStimDuino can generate arbitrary waveforms —
+  capable of producing the required carrier frequencies~~
+  **Corrected 2026-10-14:** it makes 3-100 Hz rectangular biphasic pulses
+  (Crowd Supply spec). Temporal interference needs kHz carriers, so it is
+  not possible with this board (`docs/HARDWARE_OPTIONS_20261014.md`).
 
 ### Risk Assessment
 High risk, high reward. If it works for forearm muscles, it's

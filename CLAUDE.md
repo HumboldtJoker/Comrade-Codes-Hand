@@ -27,7 +27,7 @@ This is a closed-loop control system: sense intent (EMG), observe state (camera)
 - **CC (Coalition Code)** — Project designer, software architecture, ML pipeline. AI agent (Claude-based).
 - **Thomas Edrington** — Hardware integration, human test subject, project lead.
 - **Alison Cossette** — Robotics and hardware, AI systems architecture. Proposed camera integration for accuracy and control feedback.
-- **Scraigon (Dwayne Wilkes)** — Hardware and systems. Infrastructure and integration.
+- **Dwayne Wilkes** — Hardware and systems. Infrastructure and integration. (Role line to confirm with Thomas: on 2026-10-13 he described Dwayne as an ML engineer. An earlier version of this line merged Dwayne with Scraigon, a different person.)
 - **[Medtech Executive]** — Industry guidance, regulatory pathway, funding connections.
 
 ## Key Directories
@@ -58,7 +58,7 @@ data/emg2pose/             — Meta's pretrained dataset (mini subset)
 | Component | Part | Cost | Role |
 |-----------|------|------|------|
 | EMG sensing | BioAmp Candy (4ch) | $40 | Read muscle intent signals |
-| Stimulation | NeuroStimDuino v3.0 | $260 | Generate FES current to muscles |
+| Stimulation | NeuroStimDuino v3.0 | $435 (2026-10) | Generate FES current to muscles |
 | Processing | Arduino Due | $40 | Run ML model, control loop |
 | Camera | USB webcam + MediaPipe | $20 | Visual hand tracking (21 landmarks) |
 | Mount | 3D printed (OpenSCAD) | $10 | Electrode positioning guides |
@@ -74,7 +74,7 @@ data/emg2pose/             — Meta's pretrained dataset (mini subset)
 ## Safety System (8 layers)
 
 1. Hardware emergency stop (physical kill switch)
-2. FDA-compliant current limits (25mA max)
+2. Current limits: 5 mA working, 15 mA absolute (an emergency stop), in `fes/safety.py` and the firmware. No FDA limit is claimed; the board is not FDA approved
 3. Force gradient ramping (no sudden stimulation)
 4. EMG feedback loop (detect unexpected muscle response)
 5. Fatigue detection (reduce stimulation as muscles tire)
@@ -87,15 +87,16 @@ data/emg2pose/             — Meta's pretrained dataset (mini subset)
 - The control loop runs at 50Hz. Latency budget is 20ms total.
 - Camera tracking adds ~5ms (MediaPipe is optimized for real-time).
 - The EMG→gesture classification is the bottleneck for accuracy. The emg2pose pretrained weights help enormously but still need per-user calibration.
-- NeuroStimDuino communicates via I2C. The Arduino handles all real-time control; Python handles training, calibration, and visualization.
+- NeuroStimDuino communicates via I2C (framed commands, Wire1 on the Due). `stimulation_control/neurostimduino.h` is the only code that talks to it, and it has host tests and a mutation harness (`software/arduino/tests/host/`). The Arduino handles all real-time control; Python handles training, calibration, and visualization.
 - Safety is non-negotiable. Every change must preserve or strengthen the 8-layer safety system. If in doubt, add a safety check, don't remove one.
-- The camera integration (Alison's contribution) is the newest component. The error-correction feedback loop is designed but not yet implemented in code.
+- The camera integration (Alison's contribution) is the newest component. The error-correction loop runs in simulation (`software/python/fes/pipeline.py`); it has never run on hardware.
+- Before any hardware work, read `docs/HARDWARE_OPTIONS_20261014.md`: the gates in its section 5 come first.
 
 ## Current Status
 
-**Phase**: Pre-hardware, team forming, preparing for hackathon
-**Hackathon**: May 21-22, 2026 at GitHub HQ (Assistive Technology track)
-**Priority**: Camera integration architecture, then hardware acquisition
+**Phase**: Pre-hardware. Hardware options note written 2026-10-14 (`docs/HARDWARE_OPTIONS_20261014.md`).
+**Hackathon**: postponed (was May 21-22, 2026).
+**Priority**: the software gates (G1-G7) and the team's read of the options note, then stage 1 hardware
 
 ## Project Philosophy
 

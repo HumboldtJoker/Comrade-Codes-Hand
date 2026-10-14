@@ -1,5 +1,13 @@
 # Lista de compras de hardware
 
+> **Reemplazada en parte (2026-10-14).** Lea `docs/HARDWARE_OPTIONS_20261014.md` (en ingles) antes de comprar.
+> - El NeuroStimDuino cuesta ahora **$435**, no $260.
+> - "Sin preocupaciones de IRB para uso personal" queda **retirado**. El fabricante dice que la placa "no esta
+>   destinada al uso humano ... sin la aprobacion previa de un comite de etica local". Esa pregunta va primero a
+>   nuestro asesor de tecnologia medica.
+> - "COMPRAR INMEDIATAMENTE" queda retirado: compre despues de que el equipo haya leido la nota. Los electrodos de
+>   2 pulgadas probablemente no moveran la mano con nuestro limite de 5 mA (seccion 3 de la nota).
+
 **Proyecto:** Proyecto Mano - Interfaz Neuronal Bidireccional
 **Presupuesto:** $300-500 USD (revisado de $400-800)
 **Ultima actualizacion:** 2026-03-25
@@ -84,7 +92,7 @@
 - Listo para usar inmediatamente
 - Caracteristicas de seguridad publicadas
 - API documentada
-- Sin preocupaciones de IRB para uso personal
+- ~~Sin preocupaciones de IRB para uso personal~~ (retirado 2026-10-14: vea la nota al inicio)
 - $260 versus semanas de tiempo DIY
 
 ### Alternativa: openEMSstim + TENS comercial

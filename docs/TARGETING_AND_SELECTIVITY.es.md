@@ -102,8 +102,12 @@ de dedos desde electrodos de superficie.
 - NO COMPROBADO para FES muscular periferica
 - La geometria del antebrazo es mas compleja que los modelos cerebrales
 - Ningun sistema clinico publicado de FES para mano usa este enfoque
-- El NeuroStimDuino puede generar formas de onda arbitrarias —
-  capaz de producir las frecuencias portadoras requeridas
+- ~~El NeuroStimDuino puede generar formas de onda arbitrarias —
+  capaz de producir las frecuencias portadoras requeridas~~
+  **Corregido 2026-10-14:** genera pulsos bifasicos rectangulares de 3-100 Hz
+  (especificacion de Crowd Supply). La interferencia temporal necesita
+  portadoras de kHz, asi que no es posible con esta placa
+  (`docs/HARDWARE_OPTIONS_20261014.md`).
 
 ### Evaluacion de riesgo
 Alto riesgo, alta recompensa. Si funciona para musculos del antebrazo, es
