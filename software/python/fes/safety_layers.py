@@ -25,6 +25,8 @@ caution. If a sensor is unavailable, that layer assumes the worst.
 """
 from __future__ import annotations
 
+import math
+import numbers
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -46,6 +48,19 @@ class LayerResult:
     action: SafetyAction
     detail: str
     scale: float = 1.0
+
+
+def _unavailable(*readings) -> bool:
+    """A reading that is missing or not a finite number. Every comparison with NaN is False, so without this check
+    a dead sensor reporting NaN passed every layer as OK (found 2026-10-14)."""
+    for x in readings:
+        if isinstance(x, bool) or not isinstance(x, numbers.Real) or not math.isfinite(x):
+            return True
+    return False
+
+
+def _stop_unavailable(layer: str) -> "LayerResult":
+    return LayerResult(layer, SafetyAction.STOP, "sensor reading unavailable (missing or not finite): assuming the worst")
 
 
 # ── Layer 4: EMG Feedback ───────────────────────────────────────────────
@@ -78,6 +93,8 @@ class EMGFeedbackMonitor:
             self._no_response_count = 0
             self._excessive_count = 0
             return LayerResult("emg_feedback", SafetyAction.OK, "FES inactive")
+        if _unavailable(emg_amplitude_uv):
+            return _stop_unavailable("emg_feedback")
 
         if emg_amplitude_uv < self.min_response_uv:
             self._no_response_count += 1
@@ -139,8 +156,12 @@ class FatigueMonitor:
     _baseline_ratio: Optional[float] = field(default=None, init=False)
 
     def check(self, fes_current_ua: int, emg_amplitude_uv: float) -> LayerResult:
+        if _unavailable(fes_current_ua):
+            return _stop_unavailable("fatigue")
         if fes_current_ua <= 0:
             return LayerResult("fatigue", SafetyAction.OK, "No active FES")
+        if _unavailable(emg_amplitude_uv):
+            return _stop_unavailable("fatigue")
 
         ratio = emg_amplitude_uv / max(fes_current_ua, 1)
         self._response_ratios.append(ratio)
@@ -210,6 +231,8 @@ class CameraDivergenceMonitor:
             self._errors.clear()
             self._diverging_count = 0
             return LayerResult("camera_divergence", SafetyAction.OK, "FES inactive")
+        if _unavailable(total_error_deg):
+            return _stop_unavailable("camera_divergence")
 
         self._errors.append(total_error_deg)
 
@@ -270,6 +293,8 @@ class HumanOverrideMonitor:
     _voluntary_count: int = field(default=0, init=False)
 
     def check(self, emg_between_pulses_uv: float) -> LayerResult:
+        if _unavailable(emg_between_pulses_uv):
+            return _stop_unavailable("human_override")
         if emg_between_pulses_uv > self.voluntary_threshold_uv:
             self._voluntary_count += 1
             if self._voluntary_count >= self.voluntary_patience:

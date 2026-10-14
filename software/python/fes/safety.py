@@ -26,6 +26,8 @@ The governor CLAMPS where a soft limit protects comfort (ramp, ceiling) and
 REJECTS where a hard limit protects safety (absolute current, non-biphasic).
 Every intervention is reported so the caller and logs can see it.
 """
+import math
+import numbers
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 from enum import Enum
@@ -50,6 +52,9 @@ MAX_CHARGE_PER_PHASE_UC = 2.5
 # Duty cycle: after this much continuous ON time, force a rest.
 MAX_CONTINUOUS_ON_S = 2.0
 MIN_REST_AFTER_ON_S = 5.0
+# Summed time steps drift (10 x 0.1 s is 0.9999999999999999 s); without this the duty limit let one extra tick
+# through. Found 2026-10-14.
+_TIME_EPS = 1e-9
 
 
 class Severity(Enum):
@@ -166,6 +171,15 @@ class SafetyGuard:
             zero("estop", f"E-stop latched: {self._estop_reason}", Severity.ESTOP)
             return self._finish(p, st, violations, dt_s)
 
+        # 0.5 Every field is a real, finite number, and the current a whole number of microamps. Every comparison
+        #     with NaN is False, so without this a NaN current passed every check below (found 2026-10-14).
+        if not all(_is_number(getattr(p, f)) for f in ("current_ua", "pulse_width_us", "frequency_hz", "duration_ms")) \
+                or not isinstance(p.current_ua, numbers.Integral):
+            violations.append(SafetyViolation(p.channel, "not_a_number",
+                                              "a stimulation field is missing or not a finite number", Severity.REJECTED))
+            p = StimParams(channel=p.channel)        # all-safe defaults: zero current
+            return self._finish(p, st, violations, dt_s)
+
         # 1. Biphasic is mandatory — non-negotiable tissue-safety rule.
         if not p.biphasic:
             zero("biphasic", "non-biphasic stimulation is forbidden")
@@ -244,7 +258,7 @@ class SafetyGuard:
             p.current_ua = capped
 
         # 9. Duty cycle — enforce mandatory rest after sustained stimulation.
-        if st.continuous_on_s >= self.max_continuous_on_s and p.is_active():
+        if st.continuous_on_s >= self.max_continuous_on_s - _TIME_EPS and p.is_active():
             zero("duty_cycle",
                  f"continuous ON {st.continuous_on_s:.1f}s reached limit; "
                  f"resting {self.min_rest_after_on_s:.0f}s", Severity.REJECTED)
@@ -259,10 +273,14 @@ class SafetyGuard:
             st.resting_s = 0.0
         else:
             st.resting_s += dt_s
-            if st.resting_s >= self.min_rest_after_on_s:
+            if st.resting_s >= self.min_rest_after_on_s - _TIME_EPS:
                 st.continuous_on_s = 0.0  # rest satisfied, duty budget restored
         st.last_current_ua = p.current_ua
         return SafetyDecision(params=p, violations=violations)
+
+
+def _is_number(x) -> bool:
+    return not isinstance(x, bool) and isinstance(x, numbers.Real) and math.isfinite(x)
 
 
 def check_bank(guard: SafetyGuard, commands: List[StimParams],
