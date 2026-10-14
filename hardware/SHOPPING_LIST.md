@@ -3,7 +3,8 @@
 > **Superseded in part (2026-10-14).** Read `docs/HARDWARE_OPTIONS_20261014.md` before buying anything.
 > - The NeuroStimDuino now costs **$435**, not $260.
 > - "No IRB concerns for personal use" is **withdrawn**. The vendor says the board is "not intended for human use
->   ... without prior approval from a local ethics committee". That question goes to our medtech advisor first.
+>   ... without prior approval from a local ethics committee". Thomas decided on 2026-10-14: the prototype is his own
+>   self-experiment. A formal process comes before anyone else uses it.
 > - "BUY IMMEDIATELY" is withdrawn: buy after the team has read the options note. The 2-inch pads below probably
 >   won't move a hand at our 5 mA limit (section 3 of the note).
 

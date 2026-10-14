@@ -1,6 +1,6 @@
 # Hardware options: channels, boards, costs, and the bench-first safety plan
 
-**Written:** 2026-10-14 by CC, for Thomas, Dwayne, Alison and our medtech advisor.
+**Written:** 2026-10-14 by CC, for Thomas, Scraigon, Dwayne, Alison and our medtech advisor.
 **Status:** a proposal. Nothing has been bought. Each recommendation below is open until the four of you have read it.
 
 The Hand has never touched real hardware. Everything in `software/` runs in simulation
@@ -35,9 +35,11 @@ Terms used throughout:
 5. **Before any current reaches an arm:** seven software gates, six bench tests into a dummy load, and three human
    gates (section 5). Writing this note found the old driver spoke a protocol the board doesn't use; it is
    rewritten, tested and compiling for the Due.
-6. **Vendor terms:** the board's maker says it is "not intended for human use ... without prior approval from a local
-   ethics committee". Our shopping list said "no IRB concerns for personal use". I wrote that line, and it does not
-   match the vendor's own terms. **This is the first question for the advisor.**
+6. **Vendor terms, and Thomas's decision:** the board's maker says it is "not intended for human use ... without
+   prior approval from a local ethics committee". Our shopping list said "no IRB concerns for personal use"; I wrote
+   that line, and it didn't match the vendor's terms. **Thomas decided on 2026-10-14:** this prototype is his own
+   self-experiment, a decision about his own body. If it works and the prototype grows to other people, it goes
+   through a formal process (ethics review, regulatory path) first, with the advisor.
 7. **Cost:** about $700 for stage 1 (one board, sensors, and the safety and bench gear), plus about $450 for stage 2.
    The fab lab membership covers the printing and the oscilloscope.
 
@@ -225,7 +227,7 @@ read on the fab lab's oscilloscope across a sense resistor)
 
 | # | Gate |
 |---|---|
-| H1 | The advisor's answer on the vendor's ethics-committee line and on the regulatory path; contraindications (implanted devices, heart conditions, epilepsy, pregnancy, broken skin; never across the chest) |
+| H1 | Contraindications checked for Thomas (implanted devices, heart conditions, epilepsy, broken skin; never across the chest). The prototype is Thomas's self-experiment (his decision, 2026-10-14). **Before anyone else uses it:** a formal process (ethics review, regulatory path), with the advisor |
 | H2 | The advisor decides whether a clinician or physical therapist attends or consults on first contact |
 | H3 | First contact is threshold finding only: one channel, starting from the lowest step (240 µA) with the ramp on, Thomas on the hold-to-enable switch, camera recording, stopping at the first visible twitch. Then the force-gradient progression, one phase at a time |
 
@@ -278,11 +280,14 @@ team's.
 
 ## 8. Decisions, and who they're for
 
-- **Advisor:** H1 and H2; the electrode current-density ceiling; whether a better research stimulator exists in this
-  price range.
-- **Dwayne:** four EMG channels and the stage 1 split (EMG for intent only while stimulation is off); the blanking
-  approach for later; whether to retrain at four channels on the full emg2pose set (the pretraining so far used the
-  10-recording mini set, which only proves the plumbing).
+- **Advisor:** contraindications and H2; the electrode current-density ceiling; whether a better research
+  stimulator exists in this price range; the formal process when the prototype grows past Thomas.
+- **Scraigon (hardware):** the stage 1 build and the bench: the logic-level checks (B0), the dummy load and skin
+  model (B1), the hardware stop and hold-to-enable switch (B2), the controller-loss test (B3), isolation (B4).
+- **Dwayne (ML):** four EMG channels and the stage 1 split (EMG for intent only while stimulation is off); the
+  blanking approach for later; whether to retrain at four channels on the full emg2pose set (the pretraining so far
+  used the 10-recording mini set, which only proves the plumbing). Note: emg2pose's code and data are CC BY-NC-SA
+  4.0 (non-commercial), so weights trained on it carry that licence (see `NOTICE`).
 - **Alison:** the camera's role in finding motor points, and as the main safety sensor during stimulation, given
   that EMG is blind then.
 - **Thomas:** the stage 1 list; the tape mock-up at the fab lab; when to buy.

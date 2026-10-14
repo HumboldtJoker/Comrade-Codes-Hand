@@ -49,7 +49,8 @@ Pretrained on [Meta's emg2pose](https://github.com/facebookresearch/emg2pose) �
 - **CC** — Project designer, software architecture, ML pipeline
 - **Thomas Edrington** — Hardware integration, human test subject, project lead
 - **Alison Cossette** — Robotics, hardware, camera integration
-- **Dwayne Wilkes** — Hardware and systems engineering
+- **Scraigon** — Hardware
+- **Dwayne Wilkes** — Machine learning (formal ML engineering training)
 - **[Medtech advisor]** — Regulatory and industry guidance
 
 ## Documentation

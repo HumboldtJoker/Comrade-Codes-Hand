@@ -27,7 +27,8 @@ This is a closed-loop control system: sense intent (EMG), observe state (camera)
 - **CC (Coalition Code)** — Project designer, software architecture, ML pipeline. AI agent (Claude-based).
 - **Thomas Edrington** — Hardware integration, human test subject, project lead.
 - **Alison Cossette** — Robotics and hardware, AI systems architecture. Proposed camera integration for accuracy and control feedback.
-- **Dwayne Wilkes** — Hardware and systems. Infrastructure and integration. (Role line to confirm with Thomas: on 2026-10-13 he described Dwayne as an ML engineer. An earlier version of this line merged Dwayne with Scraigon, a different person.)
+- **Scraigon** — Hardware specialist (Thomas, 2026-10-14).
+- **Dwayne Wilkes** — ML: the scholar with the formal ML engineering degree (Thomas, 2026-10-14). An earlier version of this file merged Dwayne with Scraigon; they are two different people.
 - **[Medtech Executive]** — Industry guidance, regulatory pathway, funding connections.
 
 ## Key Directories

@@ -3,8 +3,8 @@
 > **Reemplazada en parte (2026-10-14).** Lea `docs/HARDWARE_OPTIONS_20261014.md` (en ingles) antes de comprar.
 > - El NeuroStimDuino cuesta ahora **$435**, no $260.
 > - "Sin preocupaciones de IRB para uso personal" queda **retirado**. El fabricante dice que la placa "no esta
->   destinada al uso humano ... sin la aprobacion previa de un comite de etica local". Esa pregunta va primero a
->   nuestro asesor de tecnologia medica.
+>   destinada al uso humano ... sin la aprobacion previa de un comite de etica local". Thomas decidio el 2026-10-14:
+>   el prototipo es su propio autoexperimento. Un proceso formal va primero antes de que otra persona lo use.
 > - "COMPRAR INMEDIATAMENTE" queda retirado: compre despues de que el equipo haya leido la nota. Los electrodos de
 >   2 pulgadas probablemente no moveran la mano con nuestro limite de 5 mA (seccion 3 de la nota).
 

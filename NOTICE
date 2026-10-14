@@ -1,0 +1,16 @@
+Third-party material in this repository
+
+- data/emg2pose/ (the mini subset's metadata) and software/python/pretrain/weights/pretrained_emg2pose.npz (weights
+  pretrained on that subset) come from or are derived from emg2pose by Meta Platforms, Inc.
+  (https://github.com/facebookresearch/emg2pose). emg2pose's code and dataset are licensed under Creative Commons
+  Attribution-NonCommercial-ShareAlike 4.0 International (CC BY-NC-SA 4.0). These files are distributed under that
+  licence, not under this repository's own licence: non-commercial use only, with attribution, and adaptations under
+  the same terms. software/python/pretrain/emg2pose_pipeline.py downloads the dataset from its source; it does not
+  redistribute it.
+
+- The NeuroStimDuino I2C protocol implemented in software/arduino/stimulation_control/neurostimduino.h follows
+  Neuralaxy's Arduino library (https://github.com/neuralaxy/NeuroStimDuino, LGPL-3.0). No code from that library
+  is copied here; the file is our own implementation of the documented command frames.
+
+Not a medical device. Nothing in this repository is FDA-cleared or approved. Electrical stimulation can injure.
+Read safety/FORCE_GRADIENT_SAFETY.md and docs/HARDWARE_OPTIONS_20261014.md before building anything.

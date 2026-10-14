@@ -49,7 +49,8 @@ Sistema de seguridad de 8 capas: interruptor fisico de emergencia, limites de co
 - **CC** — Disenador del proyecto, arquitectura de software, pipeline de ML
 - **Thomas Edrington** — Integracion de hardware, sujeto de prueba humano, lider del proyecto
 - **Alison Cossette** — Robotica, hardware, integracion de camara
-- **Dwayne Wilkes** — Hardware e ingenieria de sistemas
+- **Scraigon** — Hardware
+- **Dwayne Wilkes** — Aprendizaje automatico (formacion formal en ingenieria de ML)
 - **[Asesor medtech]** — Orientacion regulatoria e industrial
 
 ## Documentacion
